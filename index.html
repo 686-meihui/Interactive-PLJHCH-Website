@@ -110,7 +110,8 @@ th{background:#f1e8d6;font-weight:700;text-align:left}
 .result .bigstars .on{color:var(--gold)}
 .wronglist{text-align:left;font-size:15px}
 .wronglist li{margin:6px 0}
-.timer{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px}
+.timer{font-variant-numeric:tabular-nums;color:var(--muted);font-size:15px;font-weight:700}
+.timer.late{color:#c06a00}.timer.over{color:var(--red)}
 .hidden{display:none!important}
 .readdone{text-align:center;margin:24px 0 8px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
@@ -886,10 +887,11 @@ const MODULES = [{
 //                 ★ 老師設定區（只要改這裡）★
 // =========================================================
 const CONFIG = {
-  GAS_URL: 'https://script.google.com/macros/s/AKfycby3qVXyN33No1bR_asHVyQAfZPmH5SpBgtJu2XdVfYIyRqo8DrAjbk7AnmWXWhJK-Pg/exec',            // 貼上 Google Apps Script「網頁應用程式」網址（https://script.google.com/macros/s/……/exec）
+  GAS_URL: '',            // 貼上 Google Apps Script「網頁應用程式」網址（https://script.google.com/macros/s/……/exec）
   ROUND_N: 10,            // 單元與合併練習每回題數（固定，學生不能改）
-  MIN_SEC_PER_Q: 4,       // 平均每題至少要花幾秒，全對才算過關（防止亂按、抄答案）
-  CLASSES: ['906','910','915']   // 班級選單；留空陣列 [] 則改為自由輸入
+  LIMIT_MIN: 5,           // 單元與合併練習：每回最遲幾分鐘內完成，全對才算過關（防止邊翻講義邊作答）
+  EXAM_LIMIT_MIN: 10,     // 會考挑戰：每組最遲幾分鐘內完成
+  CLASSES: ['801','802','803','804','805','806']   // 班級選單；留空陣列 [] 則改為自由輸入
 };
 
 // =========================================================
@@ -928,7 +930,7 @@ function login(){
   <label>姓名 <input id="nm" placeholder="請輸入真實姓名"></label>
   <div id="lerr" class="warn hidden"></div>
   <button class="btn red" id="lgo">開始闖關</button>
-  <p class="sub">每一關都要<b>全對</b>才算過關，而且要認真讀題——作答太快不算數喔！</p></div>
+  <p class="sub">每一關都要<b>全對</b>，而且要在<b>時間內</b>完成才算過關喔！</p></div>
   <div style="text-align:center"><button class="btn ghost small" id="tch">老師端</button></div>`;
   document.getElementById('lgo').onclick = ()=>{
     const cls = document.getElementById('cls').value.trim(), seat = String(+document.getElementById('seat').value||''), name = document.getElementById('nm').value.trim();
@@ -950,7 +952,7 @@ function home(){
   <button class="btn ghost small" id="swap" style="margin-left:auto">換人登入</button></div>
   <div class="card how"><b>闖關方式：</b><span class="chip learn">📖 單元</span>先閱讀重點，再分項練習
   <span>→</span><span class="chip mix">🔀 合併</span>混合複習 <span>→</span><span class="chip exam">🏆 會考</span>挑戰真題
-  <span>｜每回 ${CONFIG.ROUND_N} 題，<b>全對</b>且平均每題至少 ${CONFIG.MIN_SEC_PER_Q} 秒才算過關</span></div>
+  <span>｜每回 ${CONFIG.ROUND_N} 題，<b>全對</b>且在 <b>${CONFIG.LIMIT_MIN} 分鐘內</b>完成才算過關（會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘）</span></div>
   ${CONFIG.GAS_URL?'':'<div class="warn">（尚未設定成績回傳網址：成績只會存在這台電腦。）</div>'}`;
   M.sections.forEach(sec=>{
     h += `<div class="section-title">— ${sec.name} —</div><div class="path">`;
@@ -995,7 +997,7 @@ function startMix(id){
 function startExam(){
   const st = findStage(s=>s.type==='exam');
   app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button><h2>${st.title}</h2>
-  <div class="card"><p>收錄課本「嚴選會考題」<span class="badge hk">會考題</span>，以及麻辣練習題、總複習卷、會考模擬試題中的相關題目<span class="badge rel">相關試題</span>。分成三組，<b>每組全對</b>才算過關。</p>
+  <div class="card"><p>收錄課本「嚴選會考題」<span class="badge hk">會考題</span>，以及麻辣練習題、總複習卷、會考模擬試題中的相關題目<span class="badge rel">相關試題</span>。分成三組，<b>每組全對</b>且在 <b>${CONFIG.EXAM_LIMIT_MIN} 分鐘內</b>完成才算過關。</p>
   <div class="opts">${EXAM_PARTS.map(k=>`<button class="opt" data-g="${k}"><b>${EXAM_GRP[k]}</b>　<span class="sub">${EXAM.filter(e=>e.grp===k).length} 題</span>　${isPassed('e1'+k)?'<span class="pass ok">✔ 過關</span>':''}</button>`).join('')}</div></div>`;
   window.scrollTo(0,0);
   document.getElementById('bk').onclick = home;
@@ -1035,6 +1037,7 @@ function flushQueue(){
 
 function runQuiz(cfg){
   const qs = cfg.fixed; let i=0, score=0; const wrong=[]; const t0=Date.now();
+  const limitMin = limitFor(cfg); const limitSec = limitMin*60;
   let timerId;
   function render(){
     clearInterval(timerId);
@@ -1050,7 +1053,12 @@ function runQuiz(cfg){
     window.scrollTo(0,0);
     document.getElementById('bk').onclick = ()=>{ clearInterval(timerId); home(); };
     const tm = document.getElementById('tm');
-    const tick=()=>{ const s=Math.floor((Date.now()-t0)/1000); tm.textContent=`⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }; tick(); timerId=setInterval(tick,1000);
+    const tick=()=>{ const s=Math.floor((Date.now()-t0)/1000);
+      if(cfg.redo){ tm.textContent=`⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; return; }
+      const left = limitSec - s;
+      if(left>=0){ tm.textContent=`⏳ 剩下 ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`; tm.className = 'timer'+(left<=60?' late':''); }
+      else { tm.textContent=`⏰ 已超過 ${limitMin} 分鐘，這回不算過關（仍可繼續作答看詳解）`; tm.className='timer over'; } };
+    tick(); timerId=setInterval(tick,1000);
     app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(+b.dataset.k));
   }
   function answer(k){
@@ -1068,9 +1076,9 @@ function runQuiz(cfg){
     const secs = Math.max(1, Math.round((Date.now()-t0)/1000));
     const avg = Math.round(secs/qs.length*10)/10;
     const allCorrect = score===qs.length;
-    const fastOK = avg >= CONFIG.MIN_SEC_PER_Q;
+    const timeOK = secs <= limitSec;
     const official = !cfg.redo;               // 錯題再練不列入過關
-    const passed = official && allCorrect && fastOK;
+    const passed = official && allCorrect && timeOK;
     if (official){
       const p = progress[cfg.id] || {tries:0, best:0, n:qs.length, passed:false};
       p.tries++; p.n=qs.length; p.best=Math.max(p.best, score);
@@ -1078,17 +1086,18 @@ function runQuiz(cfg){
       progress[cfg.id]=p; saveProg();
     }
     sendRecord({cls:student.cls, seat:student.seat, name:student.name, stage:cfg.id, stageName:cfg.title, mode: cfg.redo?'錯題再練':'正式',
-      total:qs.length, correct:score, allCorrect, secs, avg, passed, minAvg:CONFIG.MIN_SEC_PER_Q});
+      total:qs.length, correct:score, allCorrect, secs, avg, passed, minAvg:limitMin, limitMin});
     const nxt = cfg.stage ? nextStage(cfg.stage) : null;
     let msg;
     if (passed) msg = '<b class="ok-t">🎉 全對過關！</b>可以往下一關前進。';
     else if (!official) msg = allCorrect ? '錯題都會了！回到正式練習，全對才算過關。' : '還有不熟的，再看一次詳解吧。';
-    else if (allCorrect && !fastOK) msg = `<b class="k">全對，但平均每題只花 ${avg} 秒，太快了！</b><br>請放慢速度、認真讀題，再挑戰一次才算過關（每題至少 ${CONFIG.MIN_SEC_PER_Q} 秒）。`;
+    else if (allCorrect && !timeOK) msg = `<b class="k">全對，但超過 ${limitMin} 分鐘了！</b><br>把重點記熟、不看講義，在時間內完成才算過關，再挑戰一次吧！`;
+    else if (!timeOK) msg = `答對 ${score} 題，而且超過 ${limitMin} 分鐘。<b>要全對、在時間內完成才算過關</b>，先把錯題弄懂再挑戰！`;
     else msg = `答對 ${score} 題，<b>要全對才算過關</b>。先把錯題弄懂，再挑戰一回新題目！`;
     app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button><h2>${cfg.title}</h2>
     <div class="card result"><div class="score">${score} / ${qs.length}</div>
     <div class="bigpass ${passed?'ok':''}">${passed?'✔ 過關':'尚未過關'}</div>
-    <p>${msg}<br><span class="sub">用時 ${fmtSec(secs)}・平均每題 ${avg} 秒</span></p>
+    <p>${msg}<br><span class="sub">用時 ${fmtSec(secs)}（限時 ${limitMin} 分鐘）</span></p>
     <div class="toolbar" style="justify-content:center">
       ${wrong.length?'<button class="btn" id="redo">錯題再練一次（不計過關）</button>':''}
       <button class="btn red" id="again">${cfg.examFixed?'再挑戰一次':'再挑戰一回（新題目）'}</button>
@@ -1107,6 +1116,7 @@ function runQuiz(cfg){
   }
   render();
 }
+function limitFor(cfg){ return (cfg.examFixed || /^e1/.test(cfg.id)) ? CONFIG.EXAM_LIMIT_MIN : CONFIG.LIMIT_MIN; }
 function reshuffle(q){ if(q.cols || q.opts.some(o=>/^\(/.test(o))) return q; const order = shuffle(q.opts.map((_,i)=>i)); return Object.assign({}, q, {opts:order.map(i=>q.opts[i]), ans:q.ans.map(a=>order.indexOf(a))}); }
 function stripBig(html){ return html.replace(/<div class="(letter|note|invite|post|grid2|envs)[\s\S]*$/,'（見原題）').replace(/<br>/g,' '); }
 
@@ -1126,7 +1136,7 @@ function teacher(){
   app.innerHTML = `<button class="back" id="bk">← 回學生登入</button><h2>老師端・過關總表</h2>
   <div class="card"><label>老師密碼 <input id="pin" type="password" style="width:140px"></label>
   <label style="margin-left:10px">班級 <input id="fcls" placeholder="全部" style="width:80px"></label>
-  <label style="margin-left:10px">太快標示：平均每題少於 <input id="fmin" type="number" value="${CONFIG.MIN_SEC_PER_Q}" style="width:56px"> 秒</label>
+  <span class="sub" style="margin-left:10px">過關標準：全對，且單元／合併 ${CONFIG.LIMIT_MIN} 分鐘內、會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘內完成</span>
   <button class="btn red small" id="load">讀取成績</button>
   <div id="tmsg" class="sub" style="margin-top:6px">${CONFIG.GAS_URL?'':'⚠ 尚未在程式最上方設定 GAS_URL，無法讀取成績。'}</div></div>
   <div id="tout"></div>`;
@@ -1146,7 +1156,7 @@ function loadTeacher(){
 }
 function renderTeacher(rows){
   const fcls = document.getElementById('fcls').value.trim();
-  const fmin = +document.getElementById('fmin').value || 0;
+  const lim = id => (/^e1/.test(id) ? CONFIG.EXAM_LIMIT_MIN : CONFIG.LIMIT_MIN) * 60;
   const cols = teacherColumns();
   const S = {};
   rows.filter(r=>r.mode!=='錯題再練').forEach(r=>{
@@ -1156,14 +1166,14 @@ function renderTeacher(rows){
     const c = s.st[r.stage] = s.st[r.stage] || {tries:0, best:0, pass:null, fastAll:0, n:r.total};
     c.tries++; c.best = Math.max(c.best, +r.correct); c.n = r.total;
     const allC = +r.correct === +r.total;
-    if(allC && +r.avg < fmin) c.fastAll++;
-    if(allC && +r.avg >= fmin && !c.pass) c.pass = {secs:+r.secs, avg:+r.avg, tries:c.tries, t:r.t};
+    if(allC && +r.secs > lim(r.stage)) c.fastAll++;
+    if(allC && +r.secs <= lim(r.stage) && !c.pass) c.pass = {secs:+r.secs, avg:+r.avg, tries:c.tries, t:r.t};
   });
   const list = Object.values(S).sort((a,b)=> String(a.cls).localeCompare(String(b.cls)) || a.seat-b.seat);
   if(!list.length){ document.getElementById('tout').innerHTML='<div class="card">目前沒有紀錄。</div>'; return; }
   let h = `<div class="card legend2"><b>圖例：</b><span class="cell ok">✔ 2:15</span> 全對過關（括號內第幾回才過）
   <span class="cell bad">8/10 ×3</span> 尚未過關（最佳成績・練了幾回）
-  <span class="cell fast">⚡</span> 曾經全對但太快（不算過關，可能亂猜或抄答案）・滑鼠停在格子上可看詳情</div>
+  <span class="cell fast">⏰</span> 曾經全對但超時（不算過關，可能邊看講義邊作答）・滑鼠停在格子上可看詳情</div>
   <div class="tscroll"><table class="tt"><tr><th>班級</th><th>座號</th><th>姓名</th><th>過關數</th>${cols.map(c=>`<th title="${c.name}">${c.short}</th>`).join('')}</tr>`;
   list.forEach(s=>{
     const passN = cols.filter(c=>s.st[c.id]&&s.st[c.id].pass).length;
@@ -1171,9 +1181,9 @@ function renderTeacher(rows){
     cols.forEach(c=>{
       const x = s.st[c.id];
       if(!x){ h+='<td class="cell"></td>'; return; }
-      const fast = x.fastAll ? '⚡' : '';
-      if(x.pass) h += `<td class="cell ok" title="${c.name}｜第 ${x.pass.tries} 回過關｜用時 ${fmtSec(x.pass.secs)}｜平均每題 ${x.pass.avg} 秒｜共練 ${x.tries} 回${x.fastAll?'｜另有 '+x.fastAll+' 次全對但太快':''}">✔ ${Math.floor(x.pass.secs/60)}:${String(x.pass.secs%60).padStart(2,'0')}${x.pass.tries>1?`<small>(${x.pass.tries})</small>`:''}${fast}</td>`;
-      else h += `<td class="cell ${x.fastAll?'fast':'bad'}" title="${c.name}｜最佳 ${x.best}/${x.n}｜共練 ${x.tries} 回${x.fastAll?'｜'+x.fastAll+' 次全對但太快':''}">${x.best}/${x.n} ×${x.tries}${fast}</td>`;
+      const fast = x.fastAll ? '⏰' : '';
+      if(x.pass) h += `<td class="cell ok" title="${c.name}｜第 ${x.pass.tries} 回過關｜用時 ${fmtSec(x.pass.secs)}｜共練 ${x.tries} 回${x.fastAll?'｜另有 '+x.fastAll+' 次全對但超時':''}">✔ ${Math.floor(x.pass.secs/60)}:${String(x.pass.secs%60).padStart(2,'0')}${x.pass.tries>1?`<small>(${x.pass.tries})</small>`:''}${fast}</td>`;
+      else h += `<td class="cell ${x.fastAll?'fast':'bad'}" title="${c.name}｜最佳 ${x.best}/${x.n}｜共練 ${x.tries} 回${x.fastAll?'｜'+x.fastAll+' 次全對但超時':''}">${x.best}/${x.n} ×${x.tries}${fast}</td>`;
     });
     h += '</tr>';
   });
