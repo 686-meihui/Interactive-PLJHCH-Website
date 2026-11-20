@@ -168,6 +168,7 @@ const store = {
 // 分類題：items = [[詞, '可接受的標籤(可多個)'], ...]
 function genClassify(items, labels, promptFn, expFn){
   return () => {
+    if(!items.length) return null;
     const it = pick(items); const keys = Object.keys(labels);
     const opts = keys.map(k=>labels[k]);
     const ans = keys.map((k,i)=> it[1].includes(k)?i:-1).filter(i=>i>=0);
@@ -178,6 +179,7 @@ function genClassify(items, labels, promptFn, expFn){
 // 配對題：pairs = [[詞(可用、分隔同義), 說明]]，雙向出題
 function genPairs(pairs, toMeaning, toTerm){
   return () => {
+    if(pairs.length<4) return null;
     const p = pick(pairs); const terms = p[0].split('、'); const term = pick(terms);
     const others = pairs.filter(x=>x!==p && x[1]!==p[1]);
     if (toTerm && (!toMeaning || Math.random()<.5)){
@@ -189,7 +191,7 @@ function genPairs(pairs, toMeaning, toTerm){
   };
 }
 function genFixed(list){
-  return () => { const f = pick(list); return mc(f[0], f[1], f[2], f[3]||'', {key:'f'+f[0]}); };
+  return () => { if(!list.length) return null; const f = pick(list); return mc(f[0], f[1], f[2], f[3]||'', {key:'f'+f[0]}); };
 }
 
 // =========================================================
@@ -505,8 +507,9 @@ const CONFUSE = [
   ['弄璋之喜','生男','弄瓦之喜','生女'],['椿庭日永','男壽（父）','北堂萱茂','女壽（母）']
 ];
 function ticiGen(scope, mode){
-  const pool = TICI.filter(x=>x.cats.some(c=>scope.includes(c)));
   return () => {
+    const pool = TICI.filter(x=>x.cats.some(c=>scope.includes(c)));
+    if(!pool.length) return null;
     const it = pick(pool);
     const m = mode || pick(['t2c','c2t']);
     if (m==='t2c'){
@@ -524,9 +527,9 @@ function ticiGen(scope, mode){
     }
   };
 }
+TICI.forEach(it=>{ const k = Object.keys(TICI_KEY).sort((a,b)=>b.length-a.length).find(k=>it.t.includes(k)); it.hint = k ? TICI_KEY[k] : ''; });
 function tiExp(it){
-  const k = Object.keys(TICI_KEY).sort((a,b)=>b.length-a.length).find(k=>it.t.includes(k));
-  return `「${it.t}」→ ${it.cats.map(c=>CAT[c]).join('／')}${k? '。記憶關鍵：'+TICI_KEY[k]:''}`;
+  return `「${it.t}」→ ${it.cats.map(c=>CAT[c]).join('／')}${it.hint? '。記憶關鍵：'+it.hint:''}`;
 }
 function genBigClass(){ // 慶賀 / 哀輓 / 題贈題字
   const it = pick(TICI.filter(x=>x.cats.length));
@@ -577,6 +580,7 @@ const INVITE_FACTS = [
 // =========================================================
 //                      閱讀內容
 // =========================================================
+function wordsFor(list, k, sep='、'){ return list.filter(x=>x[1].includes(k)).map(x=>x[0]).join(sep); }
 function tableHTML(head, rows){ return `<table><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`; }
 function envHTML({zip, rcol, name, title, word, lcol, zip2, size}){
   const nm = name.split('');
@@ -586,7 +590,7 @@ function envHTML({zip, rcol, name, title, word, lcol, zip2, size}){
     <div class="col lcol">${lcol}</div><div class="zip2">${zip2||''}</div></div>`;
 }
 const R = {};
-R.u1 = `
+R.u1 = () => `
 <h3>書信的結構</h3>
 ${tableHTML(['項目','說明'], PART_DEF.map(([a,b])=>[`<b>${a}</b>`, b + (OMITTED.includes(a)?' <span class="chip mix">現代書信多省略</span>':'')]))}
 <div class="tip">順序口訣：<b>稱提啟、開正結、申問自署末日期</b>（稱謂→提稱語→啟事敬詞→開頭應酬語→正文→結尾應酬語→申悃語→問候語→自稱→署名→末啟詞→日期）</div>
@@ -594,31 +598,25 @@ ${tableHTML(['項目','說明'], PART_DEF.map(([a,b])=>[`<b>${a}</b>`, b + (OMIT
 ${renderLetter(LETTERS[0], null, true)}
 <p class="sub">現代書信寫法：「媽媽：（稱謂）自從離家以後，非常想念您。（開頭應酬語）……敬祝　身體健康（問候語）　兒家生敬稟○月○日」——提稱語、啟事敬詞、申悃語都省略了。</p>`;
 
-R.u2 = `
+R.u2 = () => `
 <h3>先判斷：收信人是哪一種對象？</h3>
 ${tableHTML(['長輩','平輩','晚輩'],[[ '祖父母、父母、伯叔、姑母、舅舅、阿姨、姨丈、<b>老師</b>', '<b>哥哥、弟弟</b>、學長、學妹、同學、朋友', '兒女（小犬）、孫子、姪子（賢姪）、外甥' ]])}
 <div class="tip">注意：書信裡，<b>兄弟姊妹、學長姐、學弟妹</b>都算「平輩」。</div>
 <p>再細分成五類：<b>直系長輩</b>（祖父母、父母）、<b>旁系長輩</b>（伯叔、舅姨等其他長輩）、<b>師長</b>、<b>平輩</b>、<b>晚輩</b>。</p>
 <h3>提稱語：請對方看信</h3>
-${tableHTML(['對象','提稱語'],[
- ['直系長輩','膝下、膝前'],['旁系長輩','尊前、尊鑒、鈞鑒'],['師長','道鑒、函丈'],['平輩','大鑒、臺鑒、惠鑒、足下、左右'],['晚輩','知之、知悉、如晤、如握、收悉']])}
+${tableHTML(['對象','提稱語'], 'ABCDE'.split('').map(k=>[OBJ5[k], wordsFor(TICHENG,k)]))}
 <div class="tip">平輩口訣：「<b>足下</b>（＝閣下）<b>左右</b>的同學都<b>惠</b>考上<b>台大</b>。」→ 足下、左右、惠鑒、臺鑒、大鑒<br>
 晚輩限定詞（知之、如晤、如握、收悉）聽起來最口語——寫給老闆，保證被炒魷魚！</div>
 <div class="warn">「鑒」是請人看信的意思。「膝下」是孩子在父母膝下承歡，所以只給父母、祖父母。</div>`;
 
-R.u3 = `
+R.u3 = () => `
 <h3>結尾敬語、自稱、末啟詞一覽</h3>
-${tableHTML(['對象','申悃語','問候語','自稱','末啟詞'],[
- ['直系長輩','敬此、肅此、謹此奉稟','敬請　福安<br>叩請　金安','兒、女、孫','<b>叩上</b>、敬稟、<b>叩稟</b>'],
- ['旁系長輩','敬此、肅此','恭請　鈞安<br>恭請　崇安','姪、甥、晚','謹上、敬上'],
- ['師長','敬此、肅此','敬請　教安<br>敬請　道安','生、學生、受業','謹上、敬上'],
- ['平輩','專此、耑此','敬請　臺安、大安<br>順頌　時祺','弟、妹、學弟','謹啟、敬啟、頓首'],
- ['晚輩','匆此、草此','即問　近好<br>順問　近祺','父、母、祖父','示、字、手書']])}
+${tableHTML(['對象','申悃語','問候語','自稱','末啟詞'], 'ABCDE'.split('').map(k=>[OBJ5[k], wordsFor(SHENKUN, {A:'A',B:'A',C:'A',D:'B',E:'C'}[k]), wordsFor(WENHOU,k,'<br>'), wordsFor(ZICHENG,k), wordsFor(MOQI,k)]))}
 <div class="tip">寫給最敬重的直系長輩：最大的祝福是「<b>福安、金安</b>」；帶有跪拜意思的是「<b>叩</b>」字——叩上、叩稟、叩請。<br>
 寫給老師：問候語用「教安、道安」，教學的「教」、傳道的「道」。</div>
 <div class="warn">「敬啟」可以當<b>末啟詞</b>（寫在署名後，意思是誠敬地陳述），但<b>不可</b>當信封上的啟封詞！</div>`;
 
-R.u4 = `
+R.u4 = () => `
 <h3>直式信封</h3>
 <div class="grid2"><div>${envHTML({zip:'632-003', rcol:'雲林縣虎尾鎮林森路一段495號', name:'梁芸芸', title:'老師', word:'道啟', lcol:'新北市永和區文化路385號<br>林軒　謹緘', zip2:'234-005'})}</div>
 <div>
@@ -632,7 +630,7 @@ R.u4 = `
 <h3>中路的「稱謂」</h3>
 <p>是<b>郵差</b>對收信人的稱呼，所以寫「先生、小姐、女士、老師、主任」，<span class="k">不能寫「爸爸、妹妹、學姐」</span>。</p>
 <h3>啟封詞（請對方打開信）</h3>
-${tableHTML(['直系長輩','旁系長輩','師長','平輩','晚輩'],[['安啟、福啟','鈞啟、安啟','道啟','臺啟、大啟、惠啟','啟']])}
+${tableHTML(['直系長輩','旁系長輩','師長','平輩','晚輩'],[ 'ABCDE'.split('').map(k=>wordsFor(QIFENG,k)) ])}
 <div class="warn">啟封詞<b>絕不能用「敬啟」「恭啟」</b>——等於叫對方「恭敬地打開」我的信，非常不禮貌。</div>
 <h3>緘封詞與明信片</h3>
 ${tableHTML(['','信封','明信片'],[['啟封詞（收信人後）','○啟（臺啟、道啟…）','<b>收</b>'],['緘封詞（寄信人後）','對親長「謹緘」、對平輩「緘」','<b>寄</b>']])}
@@ -641,7 +639,7 @@ ${tableHTML(['','信封','明信片'],[['啟封詞（收信人後）','○啟（
 ${tableHTML(['名稱','做法','例子'],[['挪抬','在尊敬的詞前<b>空一格</b>','自叩別　慈顏'],['平抬','把尊敬的詞<b>換行頂格</b>寫','恭請<br>福安'],['側書','自稱寫<b>小、偏右</b>','<small>兒</small>家生叩上']])}
 <div class="tip">口訣：<b>抬兄不抬我</b>——提到對方要抬頭，提到自己要側書。</div>`;
 
-R.u5 = `
+R.u5 = () => `
 <h3>便條是什麼？</h3>
 <p>簡便的字條，也是簡化的書信。用於<b>訪友未遇、留言、請託、邀約、借送物品</b>等小事。省略應酬語，可直接交給對方、留在桌上或託人轉交，<b>不需要信封，也不用郵寄</b>。</p>
 ${renderNote()}
@@ -649,7 +647,7 @@ ${tableHTML(['格式','說明'],[['稱謂','也可放在正文後面，但要加
 <div class="warn">便條不用信封，所以<b>不能用「緘」</b>！</div>`;
 function renderNote(){ return '<div class="note">'+NOTE_SEGS.map(([k,t])=>!k?t:`<span class="seg c1">${t}</span><span class="lab" style="background:#7c6bb0">${k}</span>`).join('')+'</div>'; }
 
-R.u6 = `
+R.u6 = () => `
 <h3>口訣：家大舍小令他人</h3>
 ${tableHTML(['對象','稱自己這方','稱對方的'],[
  ['父','家父、家嚴、家君、家尊','令尊、尊翁'],['母','家母、家慈','令堂、令慈'],['兄、姊','家兄、家姊','令兄、令姊'],
@@ -662,7 +660,7 @@ ${tableHTML(['','比我年長（大）','比我年幼（小）'],[['在世','家
 ${tableHTML(['男（父）','女（母）'],[['考（亡父）、嚴、椿、怙、翁、尊、老子','妣（亡母）、慈、萱、恃、媼、嫗、堂、淑']])}
 <div class="tip">「失怙」＝父親過世，「失恃」＝母親過世；「椿萱並茂」＝父母都健在。</div>`;
 
-R.u7 = `
+R.u7 = () => `
 <h3>兩人並稱、處所與機構</h3>
 ${tableHTML(['對象','謙稱（自己）','敬稱（對方）'],[
  ['夫妻','愚夫婦','賢伉儷'],['父子','愚父子','賢喬梓'],['兄弟','愚兄弟','賢昆仲、賢昆玉'],['兄弟相稱','愚兄、愚弟','賢弟、賢兄、兄臺'],
@@ -672,7 +670,7 @@ ${tableHTML(['對象','謙稱（自己）','敬稱（對方）'],[
 <h3>綜合範例</h3>
 <div class="letter" style="font-size:16px">${FILL_TEXT.src.replace(/〔(.)〕/g,'<b class="k">$1</b>')}</div>`;
 
-R.u8 = `
+R.u8 = () => `
 <h3>人稱：指「你」還是「我」？</h3>
 ${tableHTML(['敬詞・指「你／您」','謙詞・指「我」'],[[
  '足下、閣下、臺端、左右、執事、兄臺、卿（君對臣／同輩）、陛下（天子）、殿下（太子諸王）、麾下（將帥）、鈞座（長官）',
@@ -684,18 +682,21 @@ ${tableHTML(['詞語','意思'], OTHER_JQ.map(([a,b])=>[`<b>${a}</b>`,b]))}`;
 function ticiTable(scope){
   return tableHTML(['場合','題辭'], scope.map(c=>[`<b>${CAT[c]}</b>`, TICI.filter(x=>x.cats.includes(c)).map(x=>x.t).join('、')]));
 }
-function keyList(keys){ return '<div class="tip">記憶關鍵：<br>'+keys.map(k=>`・<b>${k}</b>：${TICI_KEY[k]}`).join('<br>')+'</div>'; }
+function keyList(scope){
+  const g = {}; TICI.filter(x=>x.hint && x.cats.some(c=>scope.includes(c))).forEach(x=>{ (g[x.hint]=g[x.hint]||[]).push(x.t); });
+  const ks = Object.keys(g); if(!ks.length) return '';
+  return '<div class="tip">記憶關鍵：<br>'+ks.map(h=>`・<b>${g[h].join('、')}</b>：${h}`).join('<br>')+'</div>'; }
 const SC1=['A1','A2','A3','B1','B2','B3','C1','C2','C3','C4'];
 const SC2=['D1','D2','D3','D4','D5','D6','D7','E1','E2','F','I','J','K','L','H'];
 const SC3=['G1','G2','G3','G4','G5','G6','G7','G8','T1','T2','T3','T4'];
 const SC4=['M1','M2','M3','M4','M5','M6'];
-R.u9 = `<h3>題辭是什麼？</h3><p>題寫在各種物品（匾額、獎盃、紅包、花籃、輓聯）上的文辭，用來<b>祝賀、讚美、勉勵、哀悼</b>。要認清對象（性別、年齡、身分、場合），措辭典雅貼切。</p>
-<h3>婚嫁・生育・壽慶</h3>${ticiTable(SC1)}${keyList(['文定','秦晉','于歸','東床','宜室宜家','弄璋','弄瓦','麟兒','熊夢','千金','湯餅','椿','萱','南極星','瑤池','蟠桃','慈竹'])}`;
-R.u10 = `<h3>競賽・居室・當選與其他</h3>${ticiTable(SC2)}${keyList(['含英咀華','鐵畫銀鉤','懸河','新鶯出谷','陽春白雪','里仁為美','孟母遺風','美輪美奐','為民喉舌','桑梓','明鏡高懸','洛陽紙貴','為國干城'])}`;
-R.u11 = `<h3>開業・題贈・題字</h3>${ticiTable(SC3)}${keyList(['杏林','懸壺','陶朱','名山事業','坐擁百城','賓至如歸','平步青雲','杏壇'])}`;
-R.u12 = `<h3>哀輓類</h3>${ticiTable(SC4)}${keyList(['哲人其萎','駕鶴西歸','南極星沉','駕返瑤池','彤管','人琴俱亡','響絕牙琴','立雪神傷','甘棠遺愛'])}
+R.u9 = () => `<h3>題辭是什麼？</h3><p>題寫在各種物品（匾額、獎盃、紅包、花籃、輓聯）上的文辭，用來<b>祝賀、讚美、勉勵、哀悼</b>。要認清對象（性別、年齡、身分、場合），措辭典雅貼切。</p>
+<h3>婚嫁・生育・壽慶</h3>${ticiTable(SC1)}${keyList(SC1)}`;
+R.u10 = () => `<h3>競賽・居室・當選與其他</h3>${ticiTable(SC2)}${keyList(SC2)}`;
+R.u11 = () => `<h3>開業・題贈・題字</h3>${ticiTable(SC3)}${keyList(SC3)}`;
+R.u12 = () => `<h3>哀輓類</h3>${ticiTable(SC4)}${keyList(SC4)}
 <h3>易混淆對對碰：一字之差，喜事變喪事！</h3>${CONFUSE.map(([a,b,c,d])=>`<div class="vs"><div><b>${a}</b>（${b}）</div><div class="mid">VS</div><div><b>${c}</b>（${d}）</div></div>`).join('')}`;
-R.u13 = `
+R.u13 = () => `
 <h3>柬帖是什麼？</h3><p>婚喪喜慶、交際應酬用的簡短文書。古時刻在竹片上叫「柬」，寫在絹帛上叫「帖」。</p>
 ${tableHTML(['用途','必備內容'],[['婚嫁、慶賀、喪葬、普通應酬','<b>時間、地點、目的、發帖人姓名</b>']])}
 <h3>範例：結婚柬帖</h3>
@@ -802,6 +803,7 @@ const EXAM_GRP = {all:'全部', letter:'書信・信封・便條', title:'稱謂
 // =========================================================
 //                      單元與闖關路線
 // =========================================================
+const FIXED = {u1:[],u2:[],u3:[],u4:ENV_FACTS,u5:NOTE_FACTS,u6:SELF_ERR,u7:[],u8:JQ_USE,u9:[],u10:[],u11:[],u12:[],u13:INVITE_FACTS};
 const U = {
  u1:{title:'書信結構', desc:'十二項結構與順序', read:R.u1, gens:[
    ()=>{ const L=pick(LETTERS); const parts=uniq(L.segs.filter(s=>s[0]).map(s=>s[0])); const p=pick(parts);
@@ -882,6 +884,111 @@ const MODULES = [{
    ]}
   ]
 }];
+
+
+// =========================================================
+//        題庫（老師在 Google 試算表增刪，網頁自動讀取）
+// =========================================================
+['u1','u2','u3','u7','u9','u10','u11','u12'].forEach(uid=>U[uid].gens.push(genFixed(FIXED[uid])));
+const L5 = {直系長輩:'A',旁系長輩:'B',師長:'C',平輩:'D',晚輩:'E'};
+const L3 = {長輩:'A',平輩:'B',晚輩:'C'};
+const CLS_LISTS = {
+  '書信稱謂':[TITLE3,L3], '提稱語':[TICHENG,L5], '問候語':[WENHOU,L5], '末啟詞':[MOQI,L5], '信末自稱':[ZICHENG,L5],
+  '啟封詞':[QIFENG,L5], '申悃語':[SHENKUN,L3], '已逝稱呼':[XIANWANG,{先:'先',亡:'亡'}], '男女用字':[SEX,{男:'A',女:'B'}],
+  '謙稱敬稱':[QIAN_JING,{謙稱:'A',敬稱:'B'}], '人稱敬謙':[PERSON_WORDS,{謙稱:'A',敬稱:'B'}]
+};
+const PAIR_LISTS = {'稱自己的家人':SELF_PAIRS,'稱別人的家人':OTHER_PAIRS,'並稱與處所':BING_PAIRS,'人稱詞':PERSON_PAIRS,'其他敬謙詞':OTHER_JQ};
+const GRP_BY_NAME = {'書信・信封・便條':'letter','稱謂與敬謙詞':'title','題辭・柬帖':'tici'};
+const CAT_BY_NAME = Object.fromEntries(Object.entries(CAT).map(([k,v])=>[v,k]));
+let BANK_INFO = {source:'內建題庫', issues:[]};
+function replaceArr(a, items){ a.length = 0; items.forEach(x=>a.push(x)); }
+function splitNames(v){ return String(v).split(/[、,，\/／\s]+/).filter(Boolean); }
+function sheetRows(vals){
+  if(!vals || vals.length<1) return null;
+  const h = vals[0].map(x=>String(x).trim());
+  return vals.slice(1).map((r,i)=>{ const o={_row:i+2}; h.forEach((k,j)=>{ o[k]=String(r[j]==null?'':r[j]).trim(); }); return o; })
+    .filter(o=>h.some(k=>k && o[k]!=='') && o['啟用']!=='否');
+}
+function applyBank(b, src){
+  const issues = []; const bad = (sh,row,m)=>issues.push(`「${sh}」第 ${row} 列：${m}`);
+  let rows = sheetRows(b['分類詞']);
+  if(rows){
+    const tmp = {}; Object.keys(CLS_LISTS).forEach(k=>tmp[k]=[]);
+    rows.forEach(o=>{
+      const L = CLS_LISTS[o['清單']]; if(!L){ bad('分類詞',o._row,`清單「${o['清單']}」不認得`); return; }
+      if(!o['詞語']){ bad('分類詞',o._row,'沒有填詞語'); return; }
+      const codes = splitNames(o['分類']).map(n=>L[1][n]);
+      if(!codes.length || codes.some(c=>!c)){ bad('分類詞',o._row,`分類「${o['分類']}」不認得，可用：${Object.keys(L[1]).join('、')}`); return; }
+      tmp[o['清單']].push([o['詞語'], uniq(codes).join('')]);
+    });
+    Object.keys(CLS_LISTS).forEach(k=>replaceArr(CLS_LISTS[k][0], tmp[k]));
+  }
+  rows = sheetRows(b['詞義配對']);
+  if(rows){
+    const tmp = {}; Object.keys(PAIR_LISTS).forEach(k=>tmp[k]=[]);
+    rows.forEach(o=>{
+      if(!PAIR_LISTS[o['清單']]){ bad('詞義配對',o._row,`清單「${o['清單']}」不認得`); return; }
+      if(!o['詞語'] || !o['意思']){ bad('詞義配對',o._row,'詞語或意思沒有填'); return; }
+      tmp[o['清單']].push([o['詞語'], o['意思']]);
+    });
+    Object.keys(PAIR_LISTS).forEach(k=>{ replaceArr(PAIR_LISTS[k], tmp[k]); if(tmp[k].length && tmp[k].length<4) issues.push(`「詞義配對」清單「${k}」少於 4 個，暫時不會出題`); });
+  }
+  rows = sheetRows(b['選擇題']);
+  if(rows){
+    const tmp = {}; Object.keys(FIXED).forEach(k=>tmp[k]=[]);
+    rows.forEach(o=>{
+      const m = String(o['單元']).match(/(\d+)/); const uid = m ? 'u'+m[1] : '';
+      if(!tmp[uid]){ bad('選擇題',o._row,`單元「${o['單元']}」不認得`); return; }
+      const wrongs = [o['錯誤選項1'],o['錯誤選項2'],o['錯誤選項3']].filter(Boolean);
+      if(!o['題目'] || !o['正確答案'] || !wrongs.length){ bad('選擇題',o._row,'題目、正確答案、至少一個錯誤選項都要填'); return; }
+      if(wrongs.includes(o['正確答案'])){ bad('選擇題',o._row,'錯誤選項和正確答案一樣'); return; }
+      tmp[uid].push([o['題目'].replace(/\n/g,'<br>'), o['正確答案'], wrongs, o['詳解']||'']);
+    });
+    Object.keys(FIXED).forEach(k=>replaceArr(FIXED[k], tmp[k]));
+  }
+  rows = sheetRows(b['題辭']);
+  if(rows){
+    const tmp = [];
+    rows.forEach(o=>{
+      if(!o['題辭']){ bad('題辭',o._row,'沒有填題辭'); return; }
+      const names = [o['場合'], o['也可用於']].filter(Boolean); const cats = names.map(n=>CAT_BY_NAME[n]);
+      if(!cats.length || cats.some(c=>!c)){ bad('題辭',o._row,`場合「${names.join('、')}」不認得，請用下拉選單選`); return; }
+      tmp.push({t:o['題辭'], cats:uniq(cats), hint:o['記憶提示']||''});
+    });
+    replaceArr(TICI, tmp);
+  }
+  rows = sheetRows(b['會考題']);
+  if(rows){
+    const tmp = [];
+    rows.forEach(o=>{
+      const grp = GRP_BY_NAME[o['分組']]; if(!grp){ bad('會考題',o._row,`分組「${o['分組']}」不認得`); return; }
+      const opts = ['選項A','選項B','選項C','選項D'].map(k=>o[k]).filter(Boolean);
+      const a = 'ABCD'.indexOf(String(o['答案']).toUpperCase().replace(/[()（）]/g,''));
+      if(!o['題目'] || opts.length<2 || a<0 || a>=opts.length){ bad('會考題',o._row,'題目、至少兩個選項、答案（A～D）要填完整'); return; }
+      tmp.push({grp, tag:o['類型']==='會考題'?'hk':'rel', q:o['題目'].replace(/\n/g,'<br>'), opts, a, exp:(o['詳解']||'').replace(/\n/g,'<br>')});
+    });
+    replaceArr(EXAM, tmp);
+  }
+  BANK_INFO = {source:src, issues, at:new Date().toLocaleString()};
+}
+function bankCounts(){
+  const c = [];
+  Object.entries(CLS_LISTS).forEach(([k,v])=>c.push(['分類詞',k,v[0].length]));
+  Object.entries(PAIR_LISTS).forEach(([k,v])=>c.push(['詞義配對',k,v.length]));
+  Object.entries(FIXED).forEach(([k,v])=>c.push(['選擇題',`單元${k.slice(1)} ${U[k].title}`,v.length]));
+  c.push(['題辭','全部題辭',TICI.length]);
+  Object.entries(GRP_BY_NAME).forEach(([n,g])=>c.push(['會考題',n,EXAM.filter(e=>e.grp===g).length]));
+  return c;
+}
+function loadBank(){
+  const cached = store.get('lt_bank', null);
+  if(cached){ try{ applyBank(cached, 'Google 試算表題庫（暫存）'); }catch(e){} }
+  if(!CONFIG.GAS_URL) return Promise.resolve();
+  return fetch(CONFIG.GAS_URL + '?action=bank').then(r=>r.text()).then(t=>{
+    const d = JSON.parse(t);
+    if(d.bank && Object.keys(d.bank).length){ applyBank(d.bank, 'Google 試算表題庫'); store.set('lt_bank', d.bank); }
+  }).catch(()=>{});
+}
 
 // =========================================================
 //                 ★ 老師設定區（只要改這裡）★
@@ -984,7 +1091,7 @@ function learn(uid){
   app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button>
   <h2>單元 ${numbering[uid]}　${u.title}</h2>
   <div class="toolbar"><span class="chip learn">第一步：閱讀學習</span><span class="sub">讀完再按最下方按鈕開始練習</span></div>
-  <div class="card">${u.read}</div>
+  <div class="card">${typeof u.read==='function'?u.read():u.read}</div>
   <div class="readdone"><button class="btn red" id="go">我讀完了，開始練習 →</button></div>`;
   window.scrollTo(0,0);
   document.getElementById('bk').onclick = home;
@@ -1138,10 +1245,23 @@ function teacher(){
   <label style="margin-left:10px">班級 <input id="fcls" placeholder="全部" style="width:80px"></label>
   <span class="sub" style="margin-left:10px">過關標準：全對，且單元／合併 ${CONFIG.LIMIT_MIN} 分鐘內、會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘內完成</span>
   <button class="btn red small" id="load">讀取成績</button>
+  <button class="btn ghost small" id="bankchk">檢查題庫</button>
   <div id="tmsg" class="sub" style="margin-top:6px">${CONFIG.GAS_URL?'':'⚠ 尚未在程式最上方設定 GAS_URL，無法讀取成績。'}</div></div>
   <div id="tout"></div>`;
   document.getElementById('bk').onclick = ()=> student ? home() : login();
   document.getElementById('load').onclick = loadTeacher;
+  document.getElementById('bankchk').onclick = ()=>{
+    document.getElementById('tout').innerHTML = '<div class="card">讀取題庫中…</div>';
+    loadBank().then(showBank);
+  };
+}
+function showBank(){
+  const c = bankCounts();
+  document.getElementById('tout').innerHTML = `<div class="card"><h3 style="margin-top:0">題庫檢查</h3>
+  <p>目前使用：<b>${BANK_INFO.source}</b>${BANK_INFO.at?'（'+BANK_INFO.at+' 讀取）':''}</p>
+  ${BANK_INFO.issues.length?`<div class="warn"><b>有 ${BANK_INFO.issues.length} 列沒有被採用，請修正：</b><br>${BANK_INFO.issues.join('<br>')}</div>`:'<div class="tip">✔ 試算表每一列都讀取成功。</div>'}
+  ${tableHTML(['工作表','清單／單元','題數'], c.map(([a,b,n])=>[a,b, n===0?(a==='選擇題'?'0（可自行新增）':'<span class="k">0（不出題）</span>'):n]))}
+  <p class="sub">在試算表改完題目後，學生只要重新整理網頁，就會用新的題庫。</p></div>`;
 }
 function loadTeacher(){
   const msg = document.getElementById('tmsg');
@@ -1196,6 +1316,7 @@ function renderTeacher(rows){
 }
 
 flushQueue();
+loadBank();
 if(student) loadStudent();
 home();
 </script>
