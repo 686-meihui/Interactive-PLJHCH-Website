@@ -144,6 +144,10 @@ th{background:#f1e8d6;font-weight:700;text-align:left}
 .door .lian{background:#c0392b;color:#fff;padding:10px 8px;border-radius:4px;writing-mode:vertical-rl;min-height:170px;font-weight:700;line-height:1.4}
 .door .lian small{font-weight:400;font-size:12px}
 .door .men{flex:1;border:3px solid #8a5d00;background:#f6e3c0;display:grid;place-items:center;border-radius:4px;color:#8a5d00}
+body.quizmode{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.leavewarn{position:fixed;inset:0;background:rgba(40,30,20,.55);display:grid;place-items:center;z-index:50;padding:16px}
+.lwbox{background:#fff;border-radius:16px;padding:22px 24px;max-width:420px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.lwicon{font-size:42px}
 footer{color:var(--muted);font-size:13px;margin-top:30px;text-align:center}
 @media (max-width:520px){h1{font-size:22px}.qtext{font-size:18px}.qtext .big{font-size:26px}}
 </style>
@@ -1601,6 +1605,10 @@ const CONFIG = {
   ROUND_N: 10,            // 單元與合併練習每回題數（固定，學生不能改）
   LIMIT_MIN: 5,           // 單元與合併練習：每回最遲幾分鐘內完成，全對才算過關（防止邊翻講義邊作答）
   EXAM_LIMIT_MIN: 10,     // 會考挑戰：每組最遲幾分鐘內完成
+  BLOCK_COPY: true,       // 作答時禁止選取、複製、右鍵（true＝禁止；false＝允許）
+  LEAVE_ALLOW: 0,         // 作答中可以離開頁面幾次仍算過關（0＝只要離開就不算過關）
+  LEAVE_MIN_SEC: 5,       // 離開幾秒以上才算一次（避免系統通知等誤判）
+  FULLSCREEN: true,       // 開始作答時自動進入全螢幕（手機或部分平板不支援，會自動略過）
   CLASSES: ['906','910','915']   // 班級選單；留空陣列 [] 則改為自由輸入
 };
 
@@ -1642,7 +1650,7 @@ function login(){
   <label>姓名 <input id="nm" placeholder="請輸入真實姓名"></label>
   <div id="lerr" class="warn hidden"></div>
   <button class="btn red" id="lgo">開始闖關</button>
-  <p class="sub">每一關都要<b>全對</b>，而且要在<b>時間內</b>完成才算過關喔！</p></div>
+  <p class="sub">每一關都要<b>全對</b>、在<b>時間內</b>完成，而且作答時<b>不能離開頁面</b>，才算過關喔！</p></div>
   <div style="text-align:center"><button class="btn ghost small" id="tch">老師端</button></div>`;
   document.getElementById('lgo').onclick = ()=>{
     const cls = document.getElementById('cls').value.trim(), seat = String(+document.getElementById('seat').value||''), name = document.getElementById('nm').value.trim();
@@ -1665,7 +1673,7 @@ function home(){
   <button class="btn ghost small" id="swap" style="margin-left:auto">換人登入</button></div>
   <div class="card how"><b>闖關方式：</b><span class="chip learn">📖 單元</span>先閱讀重點，再分項練習
   <span>→</span><span class="chip mix">🔀 合併</span>混合複習 <span>→</span><span class="chip exam">🏆 會考</span>挑戰真題
-  <span>｜每回 ${CONFIG.ROUND_N} 題，<b>全對</b>且在 <b>${CONFIG.LIMIT_MIN} 分鐘內</b>完成才算過關（會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘）</span></div>
+  <span>｜每回 ${CONFIG.ROUND_N} 題，<b>全對</b>且在 <b>${CONFIG.LIMIT_MIN} 分鐘內</b>完成才算過關（會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘）；作答中離開頁面也不算過關</span></div>
   ${CONFIG.GAS_URL?'':'<div class="warn">（尚未設定成績回傳網址：成績只會存在這台電腦。）</div>'}`;
   M.sections.forEach(sec=>{
     h += `<div class="section-title">— ${sec.name} —</div><div class="path">`;
@@ -1749,23 +1757,64 @@ function flushQueue(){
     .catch(()=>{}); // 網路斷線時留在佇列，下次再送
 }
 
+// ---------- 作答保護：禁止複製、偵測離開頁面 ----------
+let QUIZ_GUARD = null;   // 作答中時為 {onLeave, onBack}
+function guardBlock(e){ if(QUIZ_GUARD && CONFIG.BLOCK_COPY){ e.preventDefault(); return false; } }
+['copy','cut','contextmenu','selectstart','dragstart'].forEach(ev=>document.addEventListener(ev, guardBlock));
+document.addEventListener('keydown', e=>{
+  if(!QUIZ_GUARD || !CONFIG.BLOCK_COPY) return;
+  const k = (e.key||'').toLowerCase();
+  if((e.ctrlKey||e.metaKey) && ['c','x','a','p','s','u','f'].includes(k)) e.preventDefault();
+});
+document.addEventListener('visibilitychange', ()=>{ if(!QUIZ_GUARD) return; if(document.hidden) QUIZ_GUARD.onLeave(); else QUIZ_GUARD.onBack(); });
+window.addEventListener('blur', ()=>{ if(QUIZ_GUARD) QUIZ_GUARD.onLeave(); });
+window.addEventListener('focus', ()=>{ if(QUIZ_GUARD) QUIZ_GUARD.onBack(); });
+function enterFull(){ try{ if(CONFIG.FULLSCREEN && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){} }
+function exitFull(){ try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){} }
+function stopGuard(){ QUIZ_GUARD = null; document.body.classList.remove('quizmode'); }
+
 function runQuiz(cfg){
   const qs = cfg.fixed; let i=0, score=0; const wrong=[]; const t0=Date.now();
   const limitMin = limitFor(cfg); const limitSec = limitMin*60;
   let timerId;
+  let leaves = 0, awaySecs = 0, awayAt = null;
+  enterFull();
+  document.body.classList.add('quizmode');
+  QUIZ_GUARD = {
+    onLeave(){ if(awayAt===null) awayAt = Date.now(); },
+    onBack(){
+      if(awayAt===null) return; const sec = (Date.now()-awayAt)/1000; awayAt = null;
+      if(sec < CONFIG.LEAVE_MIN_SEC) return;
+      leaves++; awaySecs += Math.round(sec);
+      showLeaveWarn(Math.round(sec));
+    }
+  };
+  function showLeaveWarn(sec){
+    const old = document.getElementById('leavewarn'); if(old) old.remove();
+    const d = document.createElement('div'); d.id='leavewarn'; d.className='leavewarn';
+    const over = !cfg.redo && leaves > CONFIG.LEAVE_ALLOW;
+    d.innerHTML = `<div class="lwbox"><div class="lwicon">🚪</div><b>你離開了作答頁面 ${sec} 秒</b>（這一回第 ${leaves} 次）
+      <p>${over?'<span class="k">這一回已經不算過關了</span>，可以繼續作答看詳解，再重新挑戰。':`再離開 ${CONFIG.LEAVE_ALLOW-leaves+1} 次，這一回就不算過關。`}<br>老師端會看到離開紀錄喔！</p>
+      <button class="btn red" id="lwok">回來專心作答</button></div>`;
+    document.body.appendChild(d);
+    document.getElementById('lwok').onclick = ()=>{ d.remove(); enterFull(); };
+    updLeave();
+  }
+  function updLeave(){ const el = document.getElementById('lv'); if(el){ el.textContent = leaves ? `🚪 離開 ${leaves} 次` : ''; el.className = 'timer'+(leaves>CONFIG.LEAVE_ALLOW && !cfg.redo?' over':''); } }
   function render(){
     clearInterval(timerId);
     const q = qs[i];
     const badge = q.tag==='hk' ? '<span class="badge hk">會考題</span>' : q.tag==='rel' ? '<span class="badge rel">相關試題</span>' : '';
     app.innerHTML = `<button class="back" id="bk">← 放棄這回，回地圖</button>
-    <div class="qhead"><h2 style="margin:6px 0">${cfg.title}</h2><span class="timer" id="tm"></span></div>
+    <div class="qhead"><h2 style="margin:6px 0">${cfg.title}</h2><span><span class="timer" id="lv"></span>　<span class="timer" id="tm"></span></span></div>
     <div class="qhead"><div class="bar"><i style="width:${i/qs.length*100}%"></i></div><span class="sub">第 ${i+1} / ${qs.length} 題・答對 ${score}</span></div>
     <div class="card"><div class="qtext">${badge}${q.q}</div>
     <div class="opts ${q.cols?'cols':''}">${q.opts.map((o,k)=>`<button class="opt" data-k="${k}"><span class="lt">${LT[k]}</span>${o}</button>`).join('')}</div>
     <div class="fb" id="fb"></div>
     <div class="toolbar" style="justify-content:flex-end"><button class="btn red hidden" id="nx">${i+1<qs.length?'下一題 →':'看結果'}</button></div></div>`;
     window.scrollTo(0,0);
-    document.getElementById('bk').onclick = ()=>{ clearInterval(timerId); home(); };
+    document.getElementById('bk').onclick = ()=>{ clearInterval(timerId); stopGuard(); exitFull(); home(); };
+    updLeave();
     const tm = document.getElementById('tm');
     const tick=()=>{ const s=Math.floor((Date.now()-t0)/1000);
       if(cfg.redo){ tm.textContent=`⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; return; }
@@ -1786,13 +1835,15 @@ function runQuiz(cfg){
     nx.onclick = ()=>{ i++; if(i<qs.length) render(); else finish(); };
   }
   function finish(){
-    clearInterval(timerId);
+    clearInterval(timerId); stopGuard(); exitFull();
+    const lw = document.getElementById('leavewarn'); if(lw) lw.remove();
     const secs = Math.max(1, Math.round((Date.now()-t0)/1000));
     const avg = Math.round(secs/qs.length*10)/10;
     const allCorrect = score===qs.length;
     const timeOK = secs <= limitSec;
     const official = !cfg.redo;               // 錯題再練不列入過關
-    const passed = official && allCorrect && timeOK;
+    const leaveOK = leaves <= CONFIG.LEAVE_ALLOW;
+    const passed = official && allCorrect && timeOK && leaveOK;
     if (official){
       const p = progress[cfg.id] || {tries:0, best:0, n:qs.length, passed:false};
       p.tries++; p.n=qs.length; p.best=Math.max(p.best, score);
@@ -1800,18 +1851,20 @@ function runQuiz(cfg){
       progress[cfg.id]=p; saveProg();
     }
     sendRecord({cls:student.cls, seat:student.seat, name:student.name, stage:cfg.id, stageName:cfg.title, mode: cfg.redo?'錯題再練':'正式',
-      total:qs.length, correct:score, allCorrect, secs, avg, passed, minAvg:limitMin, limitMin});
+      total:qs.length, correct:score, allCorrect, secs, avg, passed, minAvg:limitMin, limitMin, leaves, awaySecs});
     const nxt = cfg.stage ? nextStage(cfg.stage) : null;
     let msg;
     if (passed) msg = '<b class="ok-t">🎉 全對過關！</b>可以往下一關前進。';
     else if (!official) msg = allCorrect ? '錯題都會了！回到正式練習，全對才算過關。' : '還有不熟的，再看一次詳解吧。';
+    else if (allCorrect && timeOK && !leaveOK) msg = `<b class="k">全對，但作答中離開頁面 ${leaves} 次，這一回不算過關。</b><br>請留在作答頁面、不查資料，再挑戰一次！`;
+    else if (!leaveOK) msg = `答對 ${score} 題，而且作答中離開頁面 ${leaves} 次。<b>要全對、在時間內、不離開頁面才算過關</b>，再挑戰一次！`;
     else if (allCorrect && !timeOK) msg = `<b class="k">全對，但超過 ${limitMin} 分鐘了！</b><br>把重點記熟、不看講義，在時間內完成才算過關，再挑戰一次吧！`;
     else if (!timeOK) msg = `答對 ${score} 題，而且超過 ${limitMin} 分鐘。<b>要全對、在時間內完成才算過關</b>，先把錯題弄懂再挑戰！`;
     else msg = `答對 ${score} 題，<b>要全對才算過關</b>。先把錯題弄懂，再挑戰一回新題目！`;
     app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button><h2>${cfg.title}</h2>
     <div class="card result"><div class="score">${score} / ${qs.length}</div>
     <div class="bigpass ${passed?'ok':''}">${passed?'✔ 過關':'尚未過關'}</div>
-    <p>${msg}<br><span class="sub">用時 ${fmtSec(secs)}（限時 ${limitMin} 分鐘）</span></p>
+    <p>${msg}<br><span class="sub">用時 ${fmtSec(secs)}（限時 ${limitMin} 分鐘）${leaves?`・離開頁面 ${leaves} 次（共 ${awaySecs} 秒）`:''}</span></p>
     <div class="toolbar" style="justify-content:center">
       ${wrong.length?'<button class="btn" id="redo">錯題再練一次（不計過關）</button>':''}
       <button class="btn red" id="again">${cfg.examFixed?'再挑戰一次':'再挑戰一回（新題目）'}</button>
@@ -1897,27 +1950,29 @@ function renderTeacher(rows){
     const key = r.cls+'-'+r.seat; if(fcls && String(r.cls)!==fcls) return;
     const s = S[key] = S[key] || {cls:r.cls, seat:+r.seat, name:r.name, st:{}};
     s.name = r.name;
-    const c = s.st[r.stage] = s.st[r.stage] || {tries:0, best:0, pass:null, fastAll:0, n:r.total};
+    const c = s.st[r.stage] = s.st[r.stage] || {tries:0, best:0, pass:null, fastAll:0, n:r.total, leaves:0};
+    const lv = +r.leaves || 0; c.leaves += lv; s.leaves = (s.leaves||0) + lv;
     c.tries++; c.best = Math.max(c.best, +r.correct); c.n = r.total;
     const allC = +r.correct === +r.total;
     if(allC && +r.secs > lim(r.stage)) c.fastAll++;
-    if(allC && +r.secs <= lim(r.stage) && !c.pass) c.pass = {secs:+r.secs, avg:+r.avg, tries:c.tries, t:r.t};
+    if(allC && +r.secs <= lim(r.stage) && lv <= CONFIG.LEAVE_ALLOW && !c.pass) c.pass = {secs:+r.secs, avg:+r.avg, tries:c.tries, t:r.t};
   });
   const list = Object.values(S).sort((a,b)=> String(a.cls).localeCompare(String(b.cls)) || a.seat-b.seat);
   if(!list.length){ document.getElementById('tout').innerHTML='<div class="card">目前沒有紀錄。</div>'; return; }
   let h = `<div class="card legend2"><b>圖例：</b><span class="cell ok">✔ 2:15</span> 全對過關（括號內第幾回才過）
   <span class="cell bad">8/10 ×3</span> 尚未過關（最佳成績・練了幾回）
-  <span class="cell fast">⏰</span> 曾經全對但超時（不算過關，可能邊看講義邊作答）・滑鼠停在格子上可看詳情</div>
-  <div class="tscroll"><table class="tt"><tr><th>班級</th><th>座號</th><th>姓名</th><th>過關數</th>${cols.map(c=>`<th title="${c.name}">${c.short}</th>`).join('')}</tr>`;
+  <span class="cell fast">⏰</span> 曾經全對但超時（不算過關，可能邊看講義邊作答）
+  <span class="cell fast">🚪3</span> 作答中離開頁面的總次數（可能去查答案或玩別的）・滑鼠停在格子上可看詳情</div>
+  <div class="tscroll"><table class="tt"><tr><th>班級</th><th>座號</th><th>姓名</th><th>過關數</th><th title="作答中離開頁面的總次數">離開</th>${cols.map(c=>`<th title="${c.name}">${c.short}</th>`).join('')}</tr>`;
   list.forEach(s=>{
     const passN = cols.filter(c=>s.st[c.id]&&s.st[c.id].pass).length;
-    h += `<tr><td>${s.cls}</td><td>${s.seat}</td><td>${s.name}</td><td><b>${passN}</b>/${cols.length}</td>`;
+    h += `<tr><td>${s.cls}</td><td>${s.seat}</td><td>${s.name}</td><td><b>${passN}</b>/${cols.length}</td><td class="${s.leaves?'cell fast':''}">${s.leaves?'🚪'+s.leaves:''}</td>`;
     cols.forEach(c=>{
       const x = s.st[c.id];
       if(!x){ h+='<td class="cell"></td>'; return; }
-      const fast = x.fastAll ? '⏰' : '';
-      if(x.pass) h += `<td class="cell ok" title="${c.name}｜第 ${x.pass.tries} 回過關｜用時 ${fmtSec(x.pass.secs)}｜共練 ${x.tries} 回${x.fastAll?'｜另有 '+x.fastAll+' 次全對但超時':''}">✔ ${Math.floor(x.pass.secs/60)}:${String(x.pass.secs%60).padStart(2,'0')}${x.pass.tries>1?`<small>(${x.pass.tries})</small>`:''}${fast}</td>`;
-      else h += `<td class="cell ${x.fastAll?'fast':'bad'}" title="${c.name}｜最佳 ${x.best}/${x.n}｜共練 ${x.tries} 回${x.fastAll?'｜'+x.fastAll+' 次全對但超時':''}">${x.best}/${x.n} ×${x.tries}${fast}</td>`;
+      const fast = (x.fastAll ? '⏰' : '') + (x.leaves ? `<small>🚪${x.leaves}</small>` : '');
+      if(x.pass) h += `<td class="cell ok" title="${c.name}｜第 ${x.pass.tries} 回過關｜用時 ${fmtSec(x.pass.secs)}｜共練 ${x.tries} 回${x.fastAll?'｜另有 '+x.fastAll+' 次全對但超時':''}${x.leaves?'｜離開頁面 '+x.leaves+' 次':''}">✔ ${Math.floor(x.pass.secs/60)}:${String(x.pass.secs%60).padStart(2,'0')}${x.pass.tries>1?`<small>(${x.pass.tries})</small>`:''}${fast}</td>`;
+      else h += `<td class="cell ${x.fastAll?'fast':'bad'}" title="${c.name}｜最佳 ${x.best}/${x.n}｜共練 ${x.tries} 回${x.fastAll?'｜'+x.fastAll+' 次全對但超時':''}${x.leaves?'｜離開頁面 '+x.leaves+' 次':''}">${x.best}/${x.n} ×${x.tries}${fast}</td>`;
     });
     h += '</tr>';
   });
