@@ -148,6 +148,40 @@ body.quizmode{-webkit-user-select:none;user-select:none;-webkit-touch-callout:no
 .leavewarn{position:fixed;inset:0;background:rgba(40,30,20,.55);display:grid;place-items:center;z-index:50;padding:16px}
 .lwbox{background:#fff;border-radius:16px;padding:22px 24px;max-width:420px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .lwicon{font-size:42px}
+.contestbtn{margin-left:auto;background:#2f6b4f!important;border-color:#2f6b4f!important;color:#fff!important}
+.grpbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+.grpbtn{border:none;border-radius:14px;color:#fff;font-size:26px;font-weight:800;padding:22px 0;font-family:var(--serif)}
+.waitbox{text-align:center}
+.bigg{width:90px;height:90px;border-radius:50%;color:#fff;font-size:46px;font-weight:800;display:grid;place-items:center;margin:6px auto;font-family:var(--serif)}
+.dots i{display:inline-block;width:10px;height:10px;margin:4px;border-radius:50%;background:var(--muted);animation:bl 1.2s infinite}
+.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,100%{opacity:.2}50%{opacity:1}}
+.trophy{font-size:64px;animation:pop 1s ease-out;line-height:1}
+@keyframes pop{0%{transform:scale(.2) rotate(-20deg)}70%{transform:scale(1.25) rotate(8deg)}100%{transform:scale(1)}}
+table.lb{font-size:14px;margin:6px 0 0}
+table.lb td{padding:3px 6px}
+table.lb td.rk{width:34px;text-align:center;font-weight:700}
+table.lb td.nm{font-weight:700}
+table.lb tr.me td{background:#fff5cf}
+.board{background:var(--paper);min-height:100vh;padding:10px}
+.board:fullscreen{overflow:auto;padding:14px}
+.bhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-family:var(--serif);font-size:20px}
+.bclock{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;color:var(--ink)}
+.bclock.late{color:#c06a00}.bclock.end{color:var(--red)}
+.bctl{display:flex;gap:8px;align-items:center}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.qd{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;padding-bottom:6px}
+.qdh{color:#fff;font-weight:800;font-size:22px;padding:6px 14px;font-family:var(--serif)}
+.qdh small{font-size:14px;font-weight:400;opacity:.9}
+.mtn{position:relative}
+.msvg{width:100%;display:block}
+.climber{transition:transform 1s ease}
+.champ{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.92);border:3px solid #f5c542;border-radius:14px;padding:6px 14px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.champ .trophy{font-size:44px}
+.champ .cname{font-size:24px;font-weight:800;font-family:var(--serif)}
+.champ .csub{font-size:12px;color:var(--muted)}
+.qd table.lb{width:calc(100% - 16px);margin:6px 8px 0}
+@media (max-width:800px){.quad{grid-template-columns:1fr}}
 footer{color:var(--muted);font-size:13px;margin-top:30px;text-align:center}
 @media (max-width:520px){h1{font-size:22px}.qtext{font-size:18px}.qtext .big{font-size:26px}}
 </style>
@@ -1667,7 +1701,7 @@ function home(){
   const all = allStages(curMod).filter(s=>s.type!=='exam'); const done = all.filter(s=>isPassed(stageId(s))).length + ex.parts.filter(g=>isPassed(ex.id+g)).length;
   const totalN = all.length + ex.parts.length;
   let h = `<header class="top"><div class="seal">語</div><div style="flex:1"><h1>語文常識闖關站</h1><div class="sub">國中國文・${M.title}｜${M.sub}</div></div></header>
-  <div class="tabs">${MODULES.map((m,i)=>`<button class="tab ${i===curMod?'on':''}" data-mod="${i}">${m.title}</button>`).join('')}</div>
+  <div class="tabs">${MODULES.map((m,i)=>`<button class="tab ${i===curMod?'on':''}" data-mod="${i}">${m.title}</button>`).join('')}<button class="tab contestbtn" id="ctjoin">🏔 課堂競賽</button></div>
   <div class="card how"><span>👤 <b>${student.cls} 班 ${student.seat} 號 ${student.name}</b></span>
   <span>已過關 <b>${done}</b> / ${totalN} 關</span>
   <button class="btn ghost small" id="swap" style="margin-left:auto">換人登入</button></div>
@@ -1693,6 +1727,7 @@ function home(){
   h += `<footer>資料來源：${curMod===0?'課本第四冊主題專區、麻辣講義 12、課堂簡報、麻辣總複習卷、1～4冊會考模擬試題':'國文麻辣 單元15（第五冊主題專區）、單元9 季節判讀、單元3 一詞多義、對聯簡報與講義、顏色字與季節節慶人物學習單'}。</footer>`;
   app.innerHTML = h; window.scrollTo(0,0);
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ const [t,id]=b.dataset.go.split(':'); if(t==='learn') learn(id); else if(t==='mix') startMix(id); else startExam(findStage(s=>s.id===id)); });
+  document.getElementById('ctjoin').onclick = contestEntry;
   app.querySelectorAll('[data-mod]').forEach(b=>b.onclick=()=>{ curMod=+b.dataset.mod; store.set('lt_module', curMod); home(); });
   document.getElementById('swap').onclick = ()=>{ student=null; store.set('lt_student', null); login(); };
 }
@@ -1775,8 +1810,8 @@ function stopGuard(){ QUIZ_GUARD = null; document.body.classList.remove('quizmod
 
 function runQuiz(cfg){
   const qs = cfg.fixed; let i=0, score=0; const wrong=[]; const t0=Date.now();
-  const limitMin = limitFor(cfg); const limitSec = limitMin*60;
-  let timerId;
+  const limitMin = limitFor(cfg); const limitSec = Math.round(limitMin*60 - (cfg.contest ? cfg.contest.late||0 : 0));
+  let timerId, finished = false, answeredN = 0;
   let leaves = 0, awaySecs = 0, awayAt = null;
   enterFull();
   document.body.classList.add('quizmode');
@@ -1820,6 +1855,7 @@ function runQuiz(cfg){
       if(cfg.redo){ tm.textContent=`⏱ ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; return; }
       const left = limitSec - s;
       if(left>=0){ tm.textContent=`⏳ 剩下 ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`; tm.className = 'timer'+(left<=60?' late':''); }
+      else if(cfg.contest){ tm.textContent='⏰ 時間到！'; tm.className='timer over'; finish(); }
       else { tm.textContent=`⏰ 已超過 ${limitMin} 分鐘，這回不算過關（仍可繼續作答看詳解）`; tm.className='timer over'; } };
     tick(); timerId=setInterval(tick,1000);
     app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(+b.dataset.k));
@@ -1831,10 +1867,19 @@ function runQuiz(cfg){
     fb.className = 'fb '+(ok?'ok':'no');
     fb.innerHTML = (ok?'<b>✔ 答對了！</b> ':'<b>✘ 再想想：</b>正確答案是「'+q.ans.map(a=>q.opts[a]).join('」或「')+'」。<br>') + (q.exp||'');
     if(ok) score++; else wrong.push(q);
+    answeredN++;
+    if(cfg.contest){
+      cfg._wrongIdx = cfg._wrongIdx || []; if(!ok) cfg._wrongIdx.push(i);
+      ctReport(cfg, answeredN, score, Math.round((Date.now()-t0)/1000), leaves, false);
+      fb.innerHTML = ok ? '<b>✔ 答對了！往上爬一步 🧗</b>' : '<b>✘ 答錯了，原地喘口氣…</b>（比賽結束後可以看詳解）';
+      setTimeout(()=>{ if(finished) return; i++; if(i<qs.length) render(); else finish(); }, 900);
+      return;
+    }
     const nx = document.getElementById('nx'); nx.classList.remove('hidden'); nx.focus();
     nx.onclick = ()=>{ i++; if(i<qs.length) render(); else finish(); };
   }
   function finish(){
+    if(finished) return; finished = true;
     clearInterval(timerId); stopGuard(); exitFull();
     const lw = document.getElementById('leavewarn'); if(lw) lw.remove();
     const secs = Math.max(1, Math.round((Date.now()-t0)/1000));
@@ -1850,8 +1895,9 @@ function runQuiz(cfg){
       if(passed && !p.passed){ p.passed=true; p.passSecs=secs; p.passAt=new Date().toISOString(); }
       progress[cfg.id]=p; saveProg();
     }
-    sendRecord({cls:student.cls, seat:student.seat, name:student.name, stage:cfg.id, stageName:cfg.title, mode: cfg.redo?'錯題再練':'正式',
+    sendRecord({cls:student.cls, seat:student.seat, name:student.name, stage:cfg.id, stageName:cfg.title, mode: cfg.redo?'錯題再練':(cfg.contest?'競賽':'正式'),
       total:qs.length, correct:score, allCorrect, secs, avg, passed, minAvg:limitMin, limitMin, leaves, awaySecs});
+    if(cfg.contest){ ctReport(cfg, answeredN, score, secs, leaves, true); return ctResult(cfg, score, qs.length, secs); }
     const nxt = cfg.stage ? nextStage(cfg.stage) : null;
     let msg;
     if (passed) msg = '<b class="ok-t">🎉 全對過關！</b>可以往下一關前進。';
@@ -1883,7 +1929,7 @@ function runQuiz(cfg){
   }
   render();
 }
-function limitFor(cfg){ return (cfg.examFixed || /^e\d/.test(cfg.id)) ? CONFIG.EXAM_LIMIT_MIN : CONFIG.LIMIT_MIN; }
+function limitFor(cfg){ if(cfg.contest) return cfg.contest.mins; return (cfg.examFixed || /^e\d/.test(cfg.id)) ? CONFIG.EXAM_LIMIT_MIN : CONFIG.LIMIT_MIN; }
 function reshuffle(q){ if(q.cols || q.opts.some(o=>/^\(/.test(o))) return q; const order = shuffle(q.opts.map((_,i)=>i)); return Object.assign({}, q, {opts:order.map(i=>q.opts[i]), ans:q.ans.map(a=>order.indexOf(a))}); }
 function stripBig(html){ return html.replace(/<div class="(letter|note|invite|post|grid2|envs)[\s\S]*$/,'（見原題）').replace(/<br>/g,' '); }
 
@@ -1908,11 +1954,13 @@ function teacher(){
   <span class="sub" style="margin-left:10px">過關標準：全對，且單元／合併 ${CONFIG.LIMIT_MIN} 分鐘內、會考每組 ${CONFIG.EXAM_LIMIT_MIN} 分鐘內完成</span>
   <button class="btn red small" id="load">讀取成績</button>
   <button class="btn ghost small" id="bankchk">檢查題庫</button>
+  <button class="btn small" id="ctboard" style="background:#2f6b4f">🏔 課堂競賽（投影看板）</button>
   <div id="tmsg" class="sub" style="margin-top:6px">${CONFIG.GAS_URL?'':'⚠ 尚未在程式最上方設定 GAS_URL，無法讀取成績。'}</div></div>
   <div id="tout"></div>`;
   document.getElementById('bk').onclick = ()=> student ? home() : login();
   document.getElementById('load').onclick = loadTeacher;
   document.getElementById('tmod').onchange = e=>{ tMod=+e.target.value; if(lastRows) renderTeacher(lastRows); };
+  document.getElementById('ctboard').onclick = ()=>contestTeacher(document.getElementById('pin').value);
   document.getElementById('bankchk').onclick = ()=>{
     document.getElementById('tout').innerHTML = '<div class="card">讀取題庫中…</div>';
     loadBank().then(showBank);
@@ -1978,6 +2026,222 @@ function renderTeacher(rows){
   });
   h += `</table></div><div class="card sub">欄位代號：${cols.map(c=>`<b>${c.short}</b>＝${c.name}`).join('；')}<br>完整逐筆紀錄（含時間戳記、錯題再練）在 Google 試算表「紀錄」工作表，可直接篩選、排序或下載。</div>`;
   document.getElementById('tout').innerHTML = h;
+}
+
+
+// =========================================================
+//               課堂競賽：四組同時登山
+// =========================================================
+const GROUPS = ['A','B','C','D'];
+const GROUP_COLOR = {A:'#c0392b', B:'#2d6fb0', C:'#2f8a4f', D:'#b07a12'};
+let CT = { offset:0, poll:null };
+function ctGet(extra=''){
+  return fetch(CONFIG.GAS_URL + '?action=' + extra).then(r=>r.text()).then(t=>{ const d = JSON.parse(t); if(d.now) CT.offset = d.now - Date.now(); return d; });
+}
+function ctPost(obj){
+  if(!CONFIG.GAS_URL) return;
+  fetch(CONFIG.GAS_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(Object.assign({type:'contest'}, obj))}).catch(()=>{});
+}
+function ctStop(){ if(CT.poll){ clearInterval(CT.poll); CT.poll=null; } }
+function ctNow(){ return Date.now() + CT.offset; }
+function ctQuestions(c){
+  const st = examStage(c.mod);
+  const parts = c.scope==='all' ? st.parts : [c.scope];
+  return EXAM.filter(e=>parts.includes(e.grp)).map(e=>({q:e.q, opts:e.opts, ans:[e.a], exp:e.exp, tag:e.tag}));
+}
+function ctScopeName(c){ return `${MODULES[c.mod].title}・${c.scope==='all'?'會考題全部':EXAM_GRP[c.scope]}`; }
+function ctRank(list){
+  return [...list].sort((a,b)=> (b.correct-a.correct) || ((b.done?1:0)-(a.done?1:0)) || ((a.done&&b.done)?(a.secs-b.secs):(b.answered-a.answered)) || ((a.secs||0)-(b.secs||0)));
+}
+function ctPlayers(c, g){ return ctRank(Object.entries(c.players||{}).map(([k,p])=>Object.assign({key:k}, p)).filter(p=>p.group===g)); }
+function groupFinished(c, g){ const ps = ctPlayers(c,g); return ps.length>0 && ps.every(p=>p.done); }
+
+// ---------------- 學生端 ----------------
+function contestEntry(){
+  ctStop();
+  if(!CONFIG.GAS_URL){ app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button><div class="card">尚未設定 GAS_URL，無法進行競賽。</div>`; document.getElementById('bk').onclick=home; return; }
+  app.innerHTML = `<button class="back" id="bk">← 回闖關地圖</button><h2>🏔 課堂競賽</h2><div class="card" id="cbox">連線中…</div>`;
+  document.getElementById('bk').onclick = ()=>{ ctStop(); home(); };
+  ctGet('contest').then(d=>{
+    const c = d.contest; const box = document.getElementById('cbox'); if(!box) return;
+    if(!c || c.status==='ended'){ box.innerHTML = '目前沒有進行中的競賽，請等老師建立競賽後再按一次。<div class="toolbar"><button class="btn red" id="retry">重新整理</button></div>'; document.getElementById('retry').onclick=contestEntry; return; }
+    if(c.cls && c.cls!==String(student.cls)){ box.innerHTML = `這場競賽是 <b>${c.cls} 班</b> 的，你是 ${student.cls} 班，不能加入喔。`; return; }
+    const me = (c.players||{})[`${student.cls}-${student.seat}`];
+    if(me && me.group){ return ctWait(c.code, me.group); }
+    if(c.status==='running'){ box.innerHTML = '比賽已經開始了，下一場再加入吧！'; return; }
+    box.innerHTML = `<p>競賽範圍：<b>${ctScopeName(c)}</b>（${ctQuestions(c).length} 題，限時 ${c.mins} 分鐘）</p>
+      <p><b>請選擇你的組別：</b></p>
+      <div class="grpbtns">${GROUPS.map(g=>`<button class="grpbtn" data-g="${g}" style="background:${GROUP_COLOR[g]}">${g} 組</button>`).join('')}</div>
+      <p class="sub">選錯組別請告訴老師。</p>`;
+    box.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{
+      const g = b.dataset.g;
+      ctPost({code:c.code, join:true, group:g, cls:student.cls, seat:student.seat, name:student.name, answered:0, correct:0});
+      ctWait(c.code, g);
+    });
+  }).catch(()=>{ const box=document.getElementById('cbox'); if(box) box.textContent='連線失敗，請稍後再試。'; });
+}
+function ctWait(code, g){
+  ctStop();
+  app.innerHTML = `<button class="back" id="bk">← 離開競賽</button><h2>🏔 課堂競賽</h2>
+    <div class="card waitbox"><div class="bigg" style="background:${GROUP_COLOR[g]}">${g}</div>
+    <p>${student.name}，你在 <b>${g} 組</b>。</p><p class="sub" id="wmsg">等待老師按「開始比賽」…</p><div class="dots"><i></i><i></i><i></i></div></div>`;
+  document.getElementById('bk').onclick = ()=>{ ctStop(); home(); };
+  const check = ()=> ctGet('contest').then(d=>{
+    const c = d.contest;
+    if(!c || c.code!==code){ ctStop(); const m=document.getElementById('wmsg'); if(m) m.textContent='這場競賽已取消，請回地圖重新加入。'; return; }
+    if(c.status==='running'){ ctStop(); ctStart(c, g); }
+    else if(c.status==='ended'){ ctStop(); const m=document.getElementById('wmsg'); if(m) m.textContent='比賽已結束。'; }
+  }).catch(()=>{});
+  check(); CT.poll = setInterval(check, 2000);
+}
+function ctStart(c, g){
+  const st = examStage(c.mod);
+  const qs = ctQuestions(c);
+  const elapsed = Math.max(0, (ctNow() - c.startAt)/1000);
+  runQuiz({id: c.scope==='all' ? st.id+'all' : st.id+c.scope, title:`🏔 課堂競賽・${g} 組`, stage:st, fixed:qs, examFixed:true,
+    contest:{code:c.code, group:g, mins:c.mins, late:elapsed}});
+}
+function ctReport(cfg, answered, correct, secs, leaves, done){
+  ctPost({code:cfg.contest.code, group:cfg.contest.group, cls:student.cls, seat:student.seat, name:student.name, answered, correct, secs, leaves, done});
+}
+function ctResult(cfg, score, total, secs){
+  const g = cfg.contest.group;
+  app.innerHTML = `<h2>🏔 課堂競賽・${g} 組</h2>
+    <div class="card result"><div class="score">${score} / ${total}</div><p class="sub">用時 ${fmtSec(secs)}</p>
+    <div id="myrank" class="sub">等待同組同學完成…</div></div>
+    <div class="card" id="grpboard"></div>
+    <div class="card" id="rev"></div>`;
+  const wrong = cfg.fixed.filter((q,i)=>cfg._wrongIdx && cfg._wrongIdx.includes(i));
+  document.getElementById('rev').innerHTML = wrong.length ? `<h3 style="margin-top:0">錯題詳解</h3><ol class="wronglist">${wrong.map(q=>`<li>${stripBig(q.q)}<br><b class="k">答案：${q.ans.map(a=>q.opts[a]).join('／')}</b><br><span class="sub">${q.exp||''}</span></li>`).join('')}</ol>` : '<b class="ok-t">全部答對，太厲害了！</b>';
+  const show = ()=> ctGet('contest').then(d=>{
+    const c = d.contest; if(!c || c.code!==cfg.contest.code){ ctStop(); return; }
+    const ps = ctPlayers(c, g); const myKey = `${student.cls}-${student.seat}`; const r = ps.findIndex(p=>p.key===myKey)+1;
+    const over = c.status==='ended' || groupFinished(c,g);
+    const mr = document.getElementById('myrank'); if(!mr){ ctStop(); return; }
+    mr.innerHTML = over ? (r===1 ? '<div class="trophy">🏆</div><b class="ok-t" style="font-size:22px">恭喜！你是 '+g+' 組第一名！</b>' : `你是 ${g} 組第 <b>${r}</b> 名`) : `目前暫居 ${g} 組第 <b>${r}</b> 名，等待同組同學完成…`;
+    document.getElementById('grpboard').innerHTML = `<h3 style="margin-top:0">${g} 組排行榜</h3>` + ctBoardList(ps, ctQuestions(c).length, myKey);
+    if(over) ctStop();
+  }).catch(()=>{});
+  ctStop(); show(); CT.poll = setInterval(show, 4000);
+  const bk = document.createElement('button'); bk.className='btn ghost'; bk.textContent='回闖關地圖'; bk.onclick=()=>{ ctStop(); home(); };
+  app.appendChild(bk);
+}
+function ctBoardList(ps, total, myKey){
+  if(!ps.length) return '<div class="sub">還沒有人加入</div>';
+  return `<table class="lb">${ps.map((p,i)=>`<tr class="${p.key===myKey?'me':''}"><td class="rk">${p.done&&i<3?['🥇','🥈','🥉'][i]:i+1}</td><td class="nm">${p.name}</td>
+    <td>${p.correct}/${total}</td><td class="sub">${p.done?'✔ '+fmtClock(p.secs):`作答中 ${p.answered}/${total}`}</td><td>${p.leaves?'🚪'+p.leaves:''}</td></tr>`).join('')}</table>`;
+}
+function fmtClock(s){ s=Math.round(s||0); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+
+// ---------------- 老師端：投影看板 ----------------
+let CTT = { pin:'', c:null, mod:0 };
+function contestTeacher(pin){
+  ctStop(); CTT.pin = pin || CTT.pin;
+  app.innerHTML = `<button class="back" id="bk">← 回老師端</button><h2>🏔 課堂競賽・建立</h2>
+  <div class="card">
+    <label>老師密碼 <input id="cpin" type="password" value="${CTT.pin}" style="width:140px"></label>
+    <label style="margin-left:10px">冊別 <select id="cmod">${MODULES.map((m,i)=>`<option value="${i}" ${i===CTT.mod?'selected':''}>${m.title}</option>`).join('')}</select></label>
+    <label style="margin-left:10px">範圍 <select id="cscope"></select></label>
+    <label style="margin-left:10px">班級 <select id="ccls"><option value="">不限</option>${CONFIG.CLASSES.map(c=>`<option>${c}</option>`).join('')}</select></label>
+    <label style="margin-left:10px">限時 <input id="cmins" type="number" value="10" min="1" style="width:56px"> 分鐘</label>
+    <div class="toolbar"><button class="btn red" id="cnew">建立競賽</button><button class="btn ghost" id="copen">打開目前的競賽看板</button></div>
+    <div id="cmsg" class="sub"></div>
+    <p class="sub">流程：建立競賽 → 學生按地圖上的「🏔 課堂競賽」選組別加入 → 老師按「開始比賽」→ 全班同時作答，看板即時顯示四座山的登山進度。<br>
+    一次只能有一場競賽；建立新的一場會取代舊的。題目用「會考挑戰」的題庫，全班題目與順序相同。</p></div>`;
+  const fill = ()=>{ const m=+document.getElementById('cmod').value; CTT.mod=m; const st=examStage(m);
+    document.getElementById('cscope').innerHTML = `<option value="all">全部（${EXAM.filter(e=>st.parts.includes(e.grp)).length} 題）</option>` + st.parts.map(k=>`<option value="${k}">${EXAM_GRP[k]}（${EXAM.filter(e=>e.grp===k).length} 題）</option>`).join(''); };
+  fill(); document.getElementById('cmod').onchange = fill;
+  document.getElementById('bk').onclick = ()=>{ ctStop(); teacher(); };
+  const msg = t=>{ document.getElementById('cmsg').innerHTML = t; };
+  document.getElementById('cnew').onclick = ()=>{
+    CTT.pin = document.getElementById('cpin').value;
+    const q = `cset&op=create&pin=${encodeURIComponent(CTT.pin)}&mod=${CTT.mod}&scope=${document.getElementById('cscope').value}&cls=${encodeURIComponent(document.getElementById('ccls').value)}&mins=${+document.getElementById('cmins').value||10}`;
+    msg('建立中…');
+    ctGet(q).then(d=>{ if(d.error) return msg('⚠ '+d.error); CTT.c = d.contest; contestBoard(); }).catch(e=>msg('⚠ 連線失敗：'+e));
+  };
+  document.getElementById('copen').onclick = ()=>{
+    CTT.pin = document.getElementById('cpin').value;
+    ctGet('contest').then(d=>{ if(!d.contest) return msg('目前沒有競賽，請先建立。'); CTT.c=d.contest; contestBoard(); }).catch(e=>msg('⚠ 連線失敗：'+e));
+  };
+}
+function ctSet(op, extra=''){
+  return ctGet(`cset&op=${op}&pin=${encodeURIComponent(CTT.pin)}${extra}`).then(d=>{ if(d.error){ alertBox(d.error); return; } CTT.c=d.contest; renderBoard(); });
+}
+function alertBox(t){ const m=document.getElementById('bmsg'); if(m) m.textContent='⚠ '+t; }
+function contestBoard(){
+  ctStop();
+  app.innerHTML = `<div class="board" id="board">
+    <div class="bhead"><div><b id="btitle"></b><div class="sub" id="bsub"></div></div>
+      <div class="bclock" id="bclock"></div>
+      <div class="bctl"><button class="btn red" id="bstart">開始比賽</button><button class="btn" id="bend">結束比賽</button>
+      <button class="btn ghost small" id="bfull">全螢幕</button><button class="btn ghost small" id="bback">返回</button></div></div>
+    <div id="bmsg" class="sub"></div>
+    <div class="quad" id="quad">${GROUPS.map(g=>`<div class="qd" id="qd${g}"></div>`).join('')}</div></div>`;
+  document.getElementById('bstart').onclick = ()=>ctSet('start');
+  document.getElementById('bend').onclick = ()=>ctSet('end');
+  document.getElementById('bfull').onclick = ()=>{ const el=document.getElementById('board'); try{ (document.fullscreenElement?document.exitFullscreen():el.requestFullscreen()).catch(()=>{}); }catch(e){} };
+  document.getElementById('bback').onclick = ()=>{ ctStop(); contestTeacher(); };
+  renderBoard();
+  const tick = ()=> ctGet('contest').then(d=>{ CTT.c = d.contest; renderBoard(); }).catch(()=>{});
+  CT.poll = setInterval(tick, 2000); if(CT.clock) clearInterval(CT.clock); CT.clock = setInterval(()=>{ if(document.getElementById('bclock')) renderClock(); }, 1000);
+}
+function renderClock(){
+  const c = CTT.c, el = document.getElementById('bclock'); if(!el || !c) return;
+  if(c.status==='waiting'){ el.textContent = '等待開始'; el.className='bclock'; return; }
+  if(c.status==='ended'){ el.textContent = '比賽結束'; el.className='bclock end'; return; }
+  const left = Math.round(c.mins*60 - (ctNow()-c.startAt)/1000);
+  el.textContent = left>=0 ? `⏳ ${fmtClock(left)}` : '⏰ 時間到'; el.className = 'bclock'+(left<=60?' late':'');
+  if(left < -5 && c.status==='running' && !CTT.autoEnding){ CTT.autoEnding = true; ctSet('end').finally(()=>{ CTT.autoEnding=false; }); }
+}
+function renderBoard(){
+  const c = CTT.c; if(!document.getElementById('quad')) return;
+  if(!c){ document.getElementById('btitle').textContent='目前沒有競賽'; return; }
+  const total = ctQuestions(c).length;
+  const n = Object.keys(c.players||{}).length;
+  document.getElementById('btitle').textContent = `🏔 ${ctScopeName(c)}`;
+  document.getElementById('bsub').textContent = `${c.cls?c.cls+' 班・':''}${total} 題・限時 ${c.mins} 分鐘・已加入 ${n} 人`;
+  document.getElementById('bstart').classList.toggle('hidden', c.status!=='waiting');
+  document.getElementById('bend').classList.toggle('hidden', c.status!=='running');
+  renderClock();
+  GROUPS.forEach(g=>{
+    const ps = ctPlayers(c, g); const box = document.getElementById('qd'+g);
+    const champ = (c.status==='ended' || groupFinished(c,g)) && ps.length ? ps[0] : null;
+    box.innerHTML = `<div class="qdh" style="background:${GROUP_COLOR[g]}">${g} 組 <small>${ps.length} 人</small></div>
+      <div class="mtn">${mountainSVG(ps, total, g)}${champ?`<div class="champ"><div class="trophy">🏆</div><div class="cname">${champ.name}</div><div class="csub">${champ.correct}/${total}・${fmtClock(champ.secs)}</div></div>`:''}</div>
+      ${ctBoardList(ps, total, '')}`;
+  });
+}
+const TRAIL = [[30,232],[150,210],[80,178],[190,150],[120,118],[215,92],[170,66],[236,36]];
+function trailPoint(f){
+  const seg = []; let L = 0;
+  for(let i=1;i<TRAIL.length;i++){ const d = Math.hypot(TRAIL[i][0]-TRAIL[i-1][0], TRAIL[i][1]-TRAIL[i-1][1]); seg.push(d); L+=d; }
+  let t = Math.max(0,Math.min(1,f))*L;
+  for(let i=0;i<seg.length;i++){ if(t<=seg[i]){ const a=TRAIL[i], b=TRAIL[i+1], r=t/seg[i]; return [a[0]+(b[0]-a[0])*r, a[1]+(b[1]-a[1])*r]; } t-=seg[i]; }
+  return TRAIL[TRAIL.length-1];
+}
+function mountainSVG(ps, total, g){
+  const col = GROUP_COLOR[g];
+  const byPos = {};
+  const climbers = ps.map((p,i)=>{
+    const f = total ? p.correct/total : 0; const k = Math.round(f*20);
+    const j = byPos[k] = (byPos[k]||0)+1;
+    const [x,y] = trailPoint(f);
+    const dx = (j-1)%2 ? -((j)>>1)*24 : ((j-1)>>1)*24;
+    return {x:x+dx, y:y, p, below:(j-1)%2===1, top:p.done && p.correct===total};
+  });
+  return `<svg viewBox="0 0 400 250" class="msvg">
+    <defs><linearGradient id="mg${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb3a3"/><stop offset="1" stop-color="#5d7a64"/></linearGradient></defs>
+    <rect x="0" y="0" width="400" height="250" fill="#eaf3fb"/>
+    <polygon points="0,250 90,140 140,170 236,30 320,150 360,120 400,170 400,250" fill="url(#mg${g})"/>
+    <polygon points="236,30 210,70 222,66 236,78 250,64 262,72" fill="#fff"/>
+    <polyline points="${TRAIL.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#f4e3b5" stroke-width="4" stroke-dasharray="6 5" stroke-linecap="round"/>
+    <line x1="236" y1="30" x2="236" y2="6" stroke="#333" stroke-width="2"/><polygon points="236,6 258,12 236,18" fill="${col}"/>
+    ${[0.25,0.5,0.75].map(f=>{ const [x,y]=trailPoint(f); return `<text x="${x+10}" y="${y+4}" font-size="9" fill="#ffffffcc">${Math.round(f*total)}</text>`; }).join('')}
+    ${climbers.map(c=>`<g class="climber" style="transform:translate(${c.x}px,${c.y}px)">
+      <circle r="9" fill="${c.top?'#f5c542':col}" stroke="#fff" stroke-width="2"/>
+      <text y="4" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">${String(c.p.name).slice(-1)}</text>
+      <text y="${c.below?22:-12}" text-anchor="middle" font-size="10" fill="#222" font-weight="700" paint-order="stroke" stroke="#fff" stroke-width="3">${c.p.name}${c.top?' 🚩':''}</text></g>`).join('')}
+  </svg>`;
 }
 
 flushQueue();
